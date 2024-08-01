@@ -2,8 +2,8 @@ import net.minecrell.pluginyml.bukkit.BukkitPluginDescription
 
 plugins {
     `java-library`
-    id("io.papermc.paperweight.userdev") version "1.3.8"
-    id("net.minecrell.plugin-yml.bukkit") version "0.5.2"
+    id("io.papermc.paperweight.userdev") version "1.7.1" // Check for new versions at https://plugins.gradle.org/plugin/io.papermc.paperweight.userdev
+    id("net.minecrell.plugin-yml.bukkit") version "0.6.0"
 }
 
 group = "net.exenco.lightshow"
@@ -11,7 +11,7 @@ version = "1.2.4"
 description = "Display a Light-Show in Minecraft."
 
 dependencies {
-    paperDevBundle("1.20.1-R0.1-SNAPSHOT")
+    paperweight.paperDevBundle("1.21-R0.1-SNAPSHOT")
 }
 
 tasks {
@@ -22,7 +22,7 @@ tasks {
     compileJava {
         options.encoding = Charsets.UTF_8.name()
 
-        options.release.set(17)
+        options.release.set(21)
     }
     javadoc {
         options.encoding = Charsets.UTF_8.name()
@@ -31,6 +31,9 @@ tasks {
         filteringCharset = Charsets.UTF_8.name()
     }
 }
+paperweight.reobfArtifactConfiguration = io.papermc.paperweight.userdev.ReobfArtifactConfiguration.MOJANG_PRODUCTION
+
+
 
 bukkit {
     main = "net.exenco.lightshow.LightShow"

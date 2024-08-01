@@ -3,11 +3,13 @@ package net.exenco.lightshow.util;
 import com.google.gson.*;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.exenco.lightshow.LightShow;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import org.bukkit.*;
-import org.bukkit.craftbukkit.v1_20_R1.inventory.CraftItemStack;
+//import org.bukkit.craftbukkit.v1_20_R1.inventory.CraftItemStack;
+import org.bukkit.craftbukkit.inventory.CraftItemStack;
 import org.bukkit.util.Vector;
 
 import java.io.File;
@@ -106,7 +108,9 @@ public class ConfigHandler {
             nbtTag.putString("id", item.toLowerCase());
             nbtTag.putInt("Count", count);
             nbtTag.put("tag", itemNbt);
-            return ItemStack.of(nbtTag);
+            return ItemStack.CODEC.decode(NbtOps.INSTANCE, nbtTag).result().get().getFirst();
+                    //ItemStack.of(nbtTag);
+
         } catch (CommandSyntaxException e) {
             throw new RuntimeException("Cannot parse item " + count + "x " + item + nbt);
         }
@@ -117,6 +121,9 @@ public class ConfigHandler {
         nbtTagCompound.putString("id", name.toLowerCase());
         nbtTagCompound.putInt("Count", 1);
         nbtTagCompound.putString("tag", "{}");
-        return CraftItemStack.asBukkitCopy(ItemStack.of(nbtTagCompound)).getType();
+        ItemStack Item = ItemStack.CODEC.decode(NbtOps.INSTANCE, nbtTagCompound).result().get().getFirst();
+        return CraftItemStack.asBukkitCopy(Item).getType();
+        //CraftItemStack.asBukkitCopy(ItemStack.of(nbtTagCompound)).getType();
+
     }
 }
