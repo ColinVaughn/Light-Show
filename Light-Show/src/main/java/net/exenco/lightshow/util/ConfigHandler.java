@@ -50,8 +50,14 @@ public class ConfigHandler {
     }
 
     public JsonObject getConfigJson() {
-        return Objects.requireNonNull(getJsonFromFile(config)).getAsJsonObject();
+        JsonElement jsonElement = getJsonFromFile(config);
+        if (jsonElement == null) {
+            lightShow.getLogger().severe("Failed to load config.json, the file might be missing or corrupted.");
+            return new JsonObject();
+        }
+        return jsonElement.getAsJsonObject();
     }
+
 
     public JsonElement getJsonFromFile(File file) {
         if(!file.exists()) {

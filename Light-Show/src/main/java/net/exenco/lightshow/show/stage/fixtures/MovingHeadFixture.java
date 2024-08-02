@@ -58,21 +58,30 @@ public class MovingHeadFixture extends ShowFixture {
     }
 
     private ItemStack getSpotlightHead(String headTexture) {
+        if (headTexture == null) {
+            throw new IllegalArgumentException("Head texture cannot be null");
+        }
+
         ItemStack itemStack = new ItemStack(Material.PLAYER_HEAD);
         SkullMeta skullMeta = (SkullMeta) itemStack.getItemMeta();
+        if (skullMeta == null) {
+            throw new IllegalStateException("SkullMeta cannot be null");
+        }
 
-        GameProfile gameProfile = new GameProfile(UUID.randomUUID(), null);
+        GameProfile gameProfile = new GameProfile(UUID.randomUUID(), "DefaultName");  //TODO FIGURE OUT BETTER WAY
         gameProfile.getProperties().put("textures", new Property("textures", headTexture));
         try {
-            Field field = Objects.requireNonNull(skullMeta).getClass().getDeclaredField("profile");
+            Field field = skullMeta.getClass().getDeclaredField("profile");
             field.setAccessible(true);
             field.set(skullMeta, gameProfile);
-        } catch(NoSuchFieldException | IllegalAccessException e) {
+        } catch (NoSuchFieldException | IllegalAccessException e) {
             e.printStackTrace();
         }
         itemStack.setItemMeta(skullMeta);
         return itemStack;
     }
+
+
 
     private void lookAt(float yaw, float pitch) {
         Rotations vector = new Rotations(pitch, yaw, 0);
@@ -133,56 +142,66 @@ public class MovingHeadFixture extends ShowFixture {
     @Override
     public void applyState(int[] data) {
         int dim = asRoundedPercentage(data[0]);
-        float pan = 360 * -((float) (data[1]<<8 | data[2]) / 65535);
-        float tilt = 360 * -((float) (data[3]<<8 | data[4]) / 65535);
+        float pan = 360 * -((float) (data[1] << 8 | data[2]) / 65535);
+        float tilt = 360 * -((float) (data[3] << 8 | data[4]) / 65535);
         double distance = valueOfMax(this.maxDistance, data[5]);
         boolean colourChange = data[6] > 0;
 
-        if(dim > 66) {
-            if(state != 3) {
-                state = 3;
-                updateHeadArmorStand(highTexture);
-                updateLightArmorStand(Material.TORCH);
-            }
-        } else if(dim > 33) {
-            if(state != 2) {
-                state = 2;
-                updateHeadArmorStand(mediumTexture);
-                updateLightArmorStand(Material.SOUL_TORCH);
-            }
-        } else if(dim > 0) {
-            if(state != 1) {
-                state = 1;
-                updateHeadArmorStand(lowTexture);
-                updateLightArmorStand(Material.REDSTONE_TORCH);
-            }
-        } else {
-            if(state != 0) {
-                state = 0;
-                updateHeadArmorStand(offTexture);
-                updateLightArmorStand(Material.AIR);
-            }
+        // Determine new state and update textures accordingly
+        int newState = determineState(dim);
+        if (state != newState) {
+            state = newState;
+            updateHeadArmorStand(getTextureForState(newState));
+            updateLightArmorStand(getLightMaterialForState(newState));
         }
 
-        if(this.yaw != pan || this.pitch != tilt) {
-            this.yaw = pan;
-            this.pitch = tilt;
+        // Update head and light positions if needed
+        if (yaw != pan || pitch != tilt) {
+            yaw = pan;
+            pitch = tilt;
             lookAt(pan, tilt);
         }
 
-        boolean enableBeam = dim > 0 && distance > 0;
-        if(enableBeam && !guardianBeamApi.isSpawned()) {
-            guardianBeamApi.spawn();
-        } else if(!enableBeam && guardianBeamApi.isSpawned()) {
+        // Handle beam activation
+        boolean shouldActivateBeam = dim > 0 && distance > 0;
+        if (shouldActivateBeam) {
+            if (!guardianBeamApi.isSpawned()) {
+                guardianBeamApi.spawn();
+            }
+            guardianBeamApi.setDestination(getDestination(yaw, pitch, distance));
+            if (colourChange && isTick()) {
+                guardianBeamApi.callColorChange();
+            }
+        } else if (guardianBeamApi.isSpawned()) {
             guardianBeamApi.destroy();
         }
-
-        if(enableBeam && guardianBeamApi.isSpawned()) {
-            guardianBeamApi.setDestination(getDestination(yaw, pitch, distance));
-            if(colourChange && isTick())
-                guardianBeamApi.callColorChange();
-        }
     }
+
+    private int determineState(int dim) {
+        if (dim > 66) return 3;
+        if (dim > 33) return 2;
+        if (dim > 0) return 1;
+        return 0;
+    }
+
+    private String getTextureForState(int state) {
+        return switch (state) {
+            case 3 -> highTexture;
+            case 2 -> mediumTexture;
+            case 1 -> lowTexture;
+            default -> offTexture;
+        };
+    }
+
+    private Material getLightMaterialForState(int state) {
+        return switch (state) {
+            case 3 -> Material.TORCH;
+            case 2 -> Material.SOUL_TORCH;
+            case 1 -> Material.REDSTONE_TORCH;
+            default -> Material.AIR;
+        };
+    }
+
 
     private Vector getDestination(float yaw, float pitch, double distance) {
         Vector vector = VectorUtils.getDirectionVector(yaw - 90, pitch + 90);
@@ -194,17 +213,14 @@ public class MovingHeadFixture extends ShowFixture {
         return rayTrace(start, start.clone().add(vector.multiply(distance)));
     }
 
-    private Vector rayTrace(Vector location, Vector destination) {
-        Vector end = destination.clone();
-        double maxDistance = location.distance(end);
-        Vector start = location.clone();
-        Vector direction = end.clone().subtract(start).normalize();
-        start.add(direction);
+    private Vector rayTrace(Vector start, Vector destination) {
         CraftWorld world = packetHandler.getLevel().getWorld();
-        Location startLocation = start.toLocation(world);
+        double maxDistance = start.distance(destination);
+        Vector direction = destination.clone().subtract(start).normalize();
+        Vector traceStart = start.clone().add(direction.multiply(0.1)); // Adjust as needed
+        Location startLocation = traceStart.toLocation(world);
         RayTraceResult rayTraceResult = world.rayTraceBlocks(startLocation, direction, maxDistance, FluidCollisionMode.NEVER, true);
-        if(rayTraceResult != null)
-            return rayTraceResult.getHitPosition();
-        return end;
+        return (rayTraceResult != null) ? rayTraceResult.getHitPosition() : destination;
     }
+
 }

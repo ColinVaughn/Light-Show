@@ -137,7 +137,7 @@ public class PacketHandler {
      */
     private List<Packet<? extends PacketListener>> getEntitySpawnPackets(Entity entity) {
         List<Packet<? extends PacketListener>> packetList = new ArrayList<>();
-        packetList.add(new ClientboundAddEntityPacket(entity));
+        packetList.add(new ClientboundAddEntityPacket(entity, 0, entity.blockPosition()));
 
         // If entity has metadata, send packet
         ClientboundSetEntityDataPacket metadataPacket = getEntityMetadataPacket(entity);
